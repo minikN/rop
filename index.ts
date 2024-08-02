@@ -1,47 +1,76 @@
 import { curry } from './util'
-import {pipe} from './util/pipe'
+import { pipe } from './util/pipe'
 
+// ---------------------------------
+// Holy bible: https://github.com/swlaschin/RailwayOrientedProgramming/blob/master/Railway_Oriented_Programming_Slideshare.pdf
+// ---------------------------------
+
+// List of possible error types
 type ErrorTypes =
   | 'NO_USER_NAME'
   | 'NO_USER_EMAIL'
   | 'USER_TOO_YOUNG'
 
+// Message for each error type
 const ErrorMessages = Object.freeze({
   NO_USER_NAME: 'No user name given: %d',
   NO_USER_EMAIL: 'No email given: %d',
   USER_TOO_YOUNG: 'User too young: %d'
 })
 
+// Generic error interface that derives from the given
+// error type
 interface CustomError<T extends ErrorTypes> extends Error {
   name: T
   options: string[]
 }
 
+// The two sides of the "Either" type. Using tags for pattern
+// matching later on
 type Failure<T> = { tag: 'error', value: T } // left side of either
 type Success<T> = { tag: 'value', value: T } // right side of either
 
+// The "Either" type (I like "Result", "Failure", "Success" better
+// than "Either", "Left", "Right")
 type Result<E, V> = Failure<E> | Success<V>
 
+// Functions for each side of the Either that take in a value and
+// return the respective type
 const Success = <T>(value: T): Success<T> => ({ tag: 'value', value})
 const Failure = <T>(error: T): Failure<T> => ({tag: 'error', value: error})
 
- 
+// Helper function to quickly create custom errors
 const createError = <T extends ErrorTypes>(type: T, options: string[]): CustomError<T> => {
   const error = new Error(ErrorMessages[type]) as CustomError<T>
   error.name = type
   error.options = options
   return error
 }
+
+// Creating some dummy errors for testing
+// The type of this error would be <CustomError<'NO_USER_NAME'>>
+// Same for the two below
 const noNameError = createError('NO_USER_NAME', [])
 const noEmailError = createError('NO_USER_EMAIL', [])
 const tooYoungError = createError('USER_TOO_YOUNG', [])
 
+// Dummy User type for testing
 type User = {
   name: string;
   email: string;
   age: number;
 }
 
+// SWITCH FUNCTIONS
+// These are the logic functions of the pipeline
+// They receive a User and do something with it
+// (validate it, mutate it, whatever)
+
+/**
+ * "Validates" the user name
+ * @param user 
+ * @returns 
+ */
 const validateUserName = (user: User): Result<CustomError<'NO_USER_NAME'>, User> => {
   console.log('name')
   if (user?.name?.length) {
@@ -80,6 +109,17 @@ const validateUserEmail = (user: User): Result<CustomError<'NO_USER_EMAIL'>, Use
   return Failure(noEmailError)
 }
 
+/**
+ * Capitalizes the user name
+ * 
+ * This is a "single-track" function. Meaning it doesn't return
+ * a {@link Result}, {@link Success} or {@link Failure}. It just
+ * mutates the incoming data and returns it. See below how we
+ * integrate it into the pipeline.
+ * 
+ * @param user 
+ * @returns 
+ */
 const capitalizeName = (user: User): User => {
   return {
     ...user,
