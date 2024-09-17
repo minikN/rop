@@ -27,8 +27,8 @@ interface CustomError<T extends ErrorTypes> extends Error {
 
 // The two sides of the "Either" type. Using tags for pattern
 // matching later on
-type Failure<T> = { tag: 'error', value: T } // left side of either
-type Success<T> = { tag: 'value', value: T } // right side of either
+type Failure<E> = { readonly _tag: 'error', readonly error: E } // left side of either
+type Success<V> = { readonly _tag: 'value', readonly value: V } // right side of either
 
 // The "Either" type (I like "Result", "Failure", "Success" better
 // than "Either", "Left", "Right")
@@ -36,8 +36,14 @@ type Result<E, V> = Failure<E> | Success<V>
 
 // Functions for each side of the Either that take in a value and
 // return the respective type
-const Success = <T>(value: T): Success<T> => ({ tag: 'value', value})
-const Failure = <T>(error: T): Failure<T> => ({tag: 'error', value: error})
+const _failure = <E, V = never>(e: E): Result<E, V> => ({ _tag: 'error', error: e })
+const _success = <V, E = never>(v: V): Result<E, V> => ({ _tag: 'value', value: v })
+
+const Failure: <E = never, V = never>(e: E) => Result<E, V> = _failure
+const Success: <E = never, V = never>(v: V) => Result<E, V> = _success
+
+// const Success = <T>(value: T): Success<T> => ({ tag: 'value', value})
+// const Failure = <T>(error: T): Failure<T> => ({tag: 'error', value: error})
 
 // Helper function to quickly create custom errors
 const createError = <T extends ErrorTypes>(type: T, options: string[]): CustomError<T> => {
@@ -126,6 +132,44 @@ const capitalizeName = (user: User): User => {
     name: user.name.toUpperCase()
   }
 }
+
+export const dual: {
+  <DataLast extends (...args: Array<any>) => any, DataFirst extends (...args: Array<any>) => any>(
+    arity: Parameters<DataFirst>['length'],
+    body: DataFirst
+  ): DataLast & DataFirst
+  <DataLast extends (...args: Array<any>) => any, DataFirst extends (...args: Array<any>) => any>(
+    isDataFirst: (args: IArguments) => boolean,
+    body: DataFirst
+  ): DataLast & DataFirst
+} = (arity: any, body: any) => {
+  const isDataFirst: (args: IArguments) => boolean = typeof arity === 'number' ? (args) => args.length >= arity : arity
+  return function (this: any) {
+    const args = Array.from(arguments)
+    if (isDataFirst(arguments)) {
+      return body.apply(this, args)
+    }
+    return (self: any) => body(self, ...args)
+  }
+}
+
+const flatMap: {
+  <A, E2, B>(f: (a: A) => Result<E2, B>): <E1>(ma: Result<E1, A>) => Result<E1 | E2, B>
+  <E1, A, E2, B>(ma: Result<E1, A>, f: (a: A) => Result<E2, B>): Result<E1 | E2, B>
+} = /*#__PURE__*/ dual(
+  2,
+  <E1, A, E2, B>(ma: Result<E1, A>, f: (a: A) => Result<E2, B>): Result<E1 | E2, B> => (ma._tag === 'error' ? ma : f(ma.value))
+)
+
+// const flatMap: {
+//   <A, E2, B>(f: (a: A) => Result<E2, B>): <E1>(ma: Result<E1, A>) => Result<E1 | E2, B>
+//   <E1, A, E2, B>(ma: Result<E1, A>, f: (a: A) => Result<E2, B>): Result<E1 | E2, B>
+// } = <E1, A, E2, B>(ma: Result<E1, A>, f: (a: A) => Result<E2, B>): Result<E1 | E2, B> => match(ma, ) 
+
+// const flattenW: <E1, E2, A>(mma: Result<E1, Result<E2, A>>) => Result<E1 | E2, A> = flatMap((x) => x)
+// const flatten: <E, A>(mma: Result<E, Result<E, A>>) => Result<E, A> = flattenW
+
+
 /**
  * PATTERN MATCHING
  * 
@@ -134,15 +178,15 @@ const capitalizeName = (user: User): User => {
  * @param {Function} value Callback for when happy path is matched
  * @returns 
  */
-const match = <T, G, L, R>(input: Result<L, R>, error: (error: L) => T, value: (value: R) => G) => {
-  switch (input.tag) {
+const match = <pE, nE, pV, nV>(input: Result<pE, pV>, error: (e: pE) => nE, value: (v: pV) => nV): nE | nV => {
+  switch (input._tag) {
     case 'error':
-      return error(input.value)
+      return error(input.error)
     case 'value':
       return value(input.value)
-    default:
-      const _exhaustive: never = input
-      return _exhaustive
+    // default:
+    //   const _exhaustive: never = input
+    //   return _exhaustive
   }
 }
 
@@ -167,27 +211,27 @@ const match = <T, G, L, R>(input: Result<L, R>, error: (error: L) => T, value: (
 //   error => error,
 //   value => switchFunction(value)
 // )
-const bind = curry((switchFunction, previousValue) => match(
+const map = <pE, pV, E, V>(switchFunction: (v: pV) => Result<E, V>) => (previousValue: Result<pE, pV>) => match(
   previousValue,
   error => error,
   value => switchFunction(value)
-))
-
-/**
- * MAP ADAPTER FUNCTION
- * 
- * Converts a "one-track" function, meaning a function that does not return
- * an Either ({@link Result}), to a switch function by wrapping its return
- * value in a {@link Success}. 
- *  
- * @param singleFunction 
- * @returns 
- */
-const map = <R, T>(singleFunction: (a: R) => T) => <L>(previousValue: Result<L, R>) => match(
-  previousValue,
-  error => error,
-  value => Success(singleFunction(value))
 )
+
+// /**
+//  * MAP ADAPTER FUNCTION
+//  * 
+//  * Converts a "one-track" function, meaning a function that does not return
+//  * an Either ({@link Result}), to a switch function by wrapping its return
+//  * value in a {@link Success}. 
+//  *  
+//  * @param singleFunction 
+//  * @returns 
+//  */
+// const map = <R, T>(singleFunction: (a: R) => T) => <L>(previousValue: Result<L, R>) => match(
+//   previousValue,
+//   error => error,
+//   value => Success(singleFunction(value))
+// )
 
 /**
  * TEE ADAPTER FUNCTION
@@ -223,6 +267,7 @@ const guard = <L, R>(switchFunction: (a: R) => Result<L, R>) => (previousValue: 
   }
 }
 
+
 // Play with these values and check the content of test1
 // Only the first error that occurs will be logged in the
 // end because no other link in the chain will be executed
@@ -234,13 +279,18 @@ const john: User = {
 }
 
 const test1 = pipe(
-  validateUserName,
-  bind(validateUserEmail),
-  bind(validateUserAge),
-  map(capitalizeName),
-  bind(guard((a) => { throw new Error('test') })),
-  bind(tee((x) => {console.log('tee', x)})),
-)(john)
+  Success(john),
+  // x => x,
+  map(validateUserName),
+  x => x,
+  flatMap(validateUserAge),
+  x => x,
+  flatMap(validateUserEmail),
+  x => x,
+  // map(capitalizeName),
+  // bind(guard((a) => { throw new Error('test') })),
+  // bind(tee((x) => {console.log('tee', x)})),
+)
 
 
 console.log('t1', test1)

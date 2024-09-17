@@ -9,7 +9,7 @@
             "request": "launch",
             "name": "Launch Program",
             "runtimeExecutable": "${workspaceRoot}/node_modules/.bin/tsx",
-            "program": "${workspaceFolder}/index2.ts",
+            "program": "${workspaceFolder}/index.ts",
             "skipFiles": [
                 "<node_internals>/**"
             ],

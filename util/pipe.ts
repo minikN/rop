@@ -1,108 +1,297 @@
-// SOURCE: https://github.com/MathisBullinger/froebel/blob/main/pipe.ts
-
-export type λ<TA extends any[] = any[], TR = any> = (...args: TA) => TR;
-export type MakeProm<T> = Promise<T extends PromiseLike<infer I> ? I : T>;
-
-const isPromise = <T = any>(value: unknown): value is Promise<T> =>
-  typeof value === "object" &&
-  value !== null &&
-  typeof (value as any).then === "function";
-
 /**
- * Given a list of functions returns a function that will execute the given
- * functions one after another, always passing the result of the previous
- * function as an argument to the next function.
+ * Pipes the value of an expression into a pipeline of functions.
  *
- * If one of the given functions returns a promise, the promise will be resolved
- * before being passed to the next function.
+ * This is useful in combination with data-last functions as a simulation of methods:
+ *
+ * ```
+ * as.map(f).filter(g) -> pipe(as, map(f), filter(g))
+ * ```
  *
  * @example
- * ```
- * const join = (...chars: string[]) => chars.join('')
- * pipe(join, parseInt)('1', '2', '3')  // -> 123
+ * import { pipe } from "effect/Function"
+ * // Alternatively, you can use the following import syntax, as `pipe` is also conveniently exported from the `effect` entry point:
+ * // import { pipe } from "effect"
  *
- * const square = (n: number) => n ** 2
+ * const length = (s: string): number => s.length
+ * const double = (n: number): number => n * 2
+ * const decrement = (n: number): number => n - 1
  *
- * // this is equivalent to: square(square(square(2)))
- * pipe(square, square, square)(2)  // -> 256
+ * assert.deepStrictEqual(pipe(length("hello"), double, decrement), 9)
  *
- * // also works with promises:
- * fetchNumber :: async () => Promise<number>
- * pipe(fetchNumber, n => n.toString())  // async () => Promise<string>
- * ```
+ * @since 2.0.0
  */
-export const pipe = <T extends [λ, ...λ[]]>(
-  ...funs: PipeReturn<T> extends never ? never : T
-) =>
-  ((...args) => {
-    let nextArgs: unknown[] = args;
-
-    for (let i = 0; i < funs.length; i++) {
-      const [result] = nextArgs = [funs[i](...nextArgs)];
-      if (isPromise(result)) return resolveAsync(result, funs.slice(i + 1));
+export function pipe<A>(a: A): A
+export function pipe<A, B>(a: A, ab: (a: A) => B): B
+export function pipe<A, B, C>(a: A, ab: (a: A) => B, bc: (b: B) => C): C
+export function pipe<A, B, C, D>(a: A, ab: (a: A) => B, bc: (b: B) => C, cd: (c: C) => D): D
+export function pipe<A, B, C, D, E>(
+  a: A,
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  cd: (c: C) => D,
+  de: (d: D) => E
+): E
+export function pipe<A, B, C, D, E, F>(
+  a: A,
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  cd: (c: C) => D,
+  de: (d: D) => E,
+  ef: (e: E) => F
+): F
+export function pipe<A, B, C, D, E, F, G>(
+  a: A,
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  cd: (c: C) => D,
+  de: (d: D) => E,
+  ef: (e: E) => F,
+  fg: (f: F) => G
+): G
+export function pipe<A, B, C, D, E, F, G, H>(
+  a: A,
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  cd: (c: C) => D,
+  de: (d: D) => E,
+  ef: (e: E) => F,
+  fg: (f: F) => G,
+  gh: (g: G) => H
+): H
+export function pipe<A, B, C, D, E, F, G, H, I>(
+  a: A,
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  cd: (c: C) => D,
+  de: (d: D) => E,
+  ef: (e: E) => F,
+  fg: (f: F) => G,
+  gh: (g: G) => H,
+  hi: (h: H) => I
+): I
+export function pipe<A, B, C, D, E, F, G, H, I, J>(
+  a: A,
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  cd: (c: C) => D,
+  de: (d: D) => E,
+  ef: (e: E) => F,
+  fg: (f: F) => G,
+  gh: (g: G) => H,
+  hi: (h: H) => I,
+  ij: (i: I) => J
+): J
+export function pipe<A, B, C, D, E, F, G, H, I, J, K>(
+  a: A,
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  cd: (c: C) => D,
+  de: (d: D) => E,
+  ef: (e: E) => F,
+  fg: (f: F) => G,
+  gh: (g: G) => H,
+  hi: (h: H) => I,
+  ij: (i: I) => J,
+  jk: (j: J) => K
+): K
+export function pipe<A, B, C, D, E, F, G, H, I, J, K, L>(
+  a: A,
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  cd: (c: C) => D,
+  de: (d: D) => E,
+  ef: (e: E) => F,
+  fg: (f: F) => G,
+  gh: (g: G) => H,
+  hi: (h: H) => I,
+  ij: (i: I) => J,
+  jk: (j: J) => K,
+  kl: (k: K) => L
+): L
+export function pipe<A, B, C, D, E, F, G, H, I, J, K, L, M>(
+  a: A,
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  cd: (c: C) => D,
+  de: (d: D) => E,
+  ef: (e: E) => F,
+  fg: (f: F) => G,
+  gh: (g: G) => H,
+  hi: (h: H) => I,
+  ij: (i: I) => J,
+  jk: (j: J) => K,
+  kl: (k: K) => L,
+  lm: (l: L) => M
+): M
+export function pipe<A, B, C, D, E, F, G, H, I, J, K, L, M, N>(
+  a: A,
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  cd: (c: C) => D,
+  de: (d: D) => E,
+  ef: (e: E) => F,
+  fg: (f: F) => G,
+  gh: (g: G) => H,
+  hi: (h: H) => I,
+  ij: (i: I) => J,
+  jk: (j: J) => K,
+  kl: (k: K) => L,
+  lm: (l: L) => M,
+  mn: (m: M) => N
+): N
+export function pipe<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O>(
+  a: A,
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  cd: (c: C) => D,
+  de: (d: D) => E,
+  ef: (e: E) => F,
+  fg: (f: F) => G,
+  gh: (g: G) => H,
+  hi: (h: H) => I,
+  ij: (i: I) => J,
+  jk: (j: J) => K,
+  kl: (k: K) => L,
+  lm: (l: L) => M,
+  mn: (m: M) => N,
+  no: (n: N) => O
+): O
+export function pipe<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P>(
+  a: A,
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  cd: (c: C) => D,
+  de: (d: D) => E,
+  ef: (e: E) => F,
+  fg: (f: F) => G,
+  gh: (g: G) => H,
+  hi: (h: H) => I,
+  ij: (i: I) => J,
+  jk: (j: J) => K,
+  kl: (k: K) => L,
+  lm: (l: L) => M,
+  mn: (m: M) => N,
+  no: (n: N) => O,
+  op: (o: O) => P
+): P
+export function pipe<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q>(
+  a: A,
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  cd: (c: C) => D,
+  de: (d: D) => E,
+  ef: (e: E) => F,
+  fg: (f: F) => G,
+  gh: (g: G) => H,
+  hi: (h: H) => I,
+  ij: (i: I) => J,
+  jk: (j: J) => K,
+  kl: (k: K) => L,
+  lm: (l: L) => M,
+  mn: (m: M) => N,
+  no: (n: N) => O,
+  op: (o: O) => P,
+  pq: (p: P) => Q
+): Q
+export function pipe<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R>(
+  a: A,
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  cd: (c: C) => D,
+  de: (d: D) => E,
+  ef: (e: E) => F,
+  fg: (f: F) => G,
+  gh: (g: G) => H,
+  hi: (h: H) => I,
+  ij: (i: I) => J,
+  jk: (j: J) => K,
+  kl: (k: K) => L,
+  lm: (l: L) => M,
+  mn: (m: M) => N,
+  no: (n: N) => O,
+  op: (o: O) => P,
+  pq: (p: P) => Q,
+  qr: (q: Q) => R
+): R
+export function pipe<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S>(
+  a: A,
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  cd: (c: C) => D,
+  de: (d: D) => E,
+  ef: (e: E) => F,
+  fg: (f: F) => G,
+  gh: (g: G) => H,
+  hi: (h: H) => I,
+  ij: (i: I) => J,
+  jk: (j: J) => K,
+  kl: (k: K) => L,
+  lm: (l: L) => M,
+  mn: (m: M) => N,
+  no: (n: N) => O,
+  op: (o: O) => P,
+  pq: (p: P) => Q,
+  qr: (q: Q) => R,
+  rs: (r: R) => S
+): S
+export function pipe<A, B, C, D, E, F, G, H, I, J, K, L, M, N, O, P, Q, R, S, T>(
+  a: A,
+  ab: (a: A) => B,
+  bc: (b: B) => C,
+  cd: (c: C) => D,
+  de: (d: D) => E,
+  ef: (e: E) => F,
+  fg: (f: F) => G,
+  gh: (g: G) => H,
+  hi: (h: H) => I,
+  ij: (i: I) => J,
+  jk: (j: J) => K,
+  kl: (k: K) => L,
+  lm: (l: L) => M,
+  mn: (m: M) => N,
+  no: (n: N) => O,
+  op: (o: O) => P,
+  pq: (p: P) => Q,
+  qr: (q: Q) => R,
+  rs: (r: R) => S,
+  st: (s: S) => T
+): T
+export function pipe(
+  a: unknown,
+  ab?: Function,
+  bc?: Function,
+  cd?: Function,
+  de?: Function,
+  ef?: Function,
+  fg?: Function,
+  gh?: Function,
+  hi?: Function
+): unknown {
+  switch (arguments.length) {
+    case 1:
+      return a
+    case 2:
+      return ab!(a)
+    case 3:
+      return bc!(ab!(a))
+    case 4:
+      return cd!(bc!(ab!(a)))
+    case 5:
+      return de!(cd!(bc!(ab!(a))))
+    case 6:
+      return ef!(de!(cd!(bc!(ab!(a)))))
+    case 7:
+      return fg!(ef!(de!(cd!(bc!(ab!(a))))))
+    case 8:
+      return gh!(fg!(ef!(de!(cd!(bc!(ab!(a)))))))
+    case 9:
+      return hi!(gh!(fg!(ef!(de!(cd!(bc!(ab!(a))))))))
+    default: {
+      let ret = arguments[0]
+      for (let i = 1; i < arguments.length; i++) {
+        ret = arguments[i](ret)
+      }
+      return ret
     }
-
-    return nextArgs[0];
-  }) as PipedFun<T>;
-
-export default pipe;
-
-export const mappedPipe = (
-  mapFn: (next: Function) => (...x: unknown[]) => unknown
-) =>
- <T extends [λ, ...λ[]]>(...funs) => ((...args) => {
-    let nextArgs: unknown[] = args;
-
-    for (let i = 0; i < funs.length; i++) {
-    const [result] = nextArgs = [i > 0 ? mapFn(funs[i])(...nextArgs) : funs[i](...nextArgs)];
-    if (isPromise(result)) return resolveAsync(result, funs.slice(i + 1));
-    }
-
-    return nextArgs[0];
-}) as PipedFun<T>;
-
-
-const resolveAsync = async (result: unknown, funs: λ[]) => {
-  for (const fun of funs) result = fun(await result);
-  return await result;
-};
-
-type PipedFun<T extends λ[]> = PipeReturn<T> extends never ? never
-  : ((...args: Parameters<T[0]>) => PipeReturn<T>);
-
-type PipeReturn<F extends λ[]> = CheckPipe<
-  F,
-  CarryReturn<ReturnTypes<F>, Parameters<F[0]>>
->;
-
-type FunDef = [Return: any, Args: any[]];
-
-type CheckPipe<
-  F extends λ[],
-  D extends FunDef[],
-  Async extends boolean = false,
-> = F extends [any, any, ...any[]]
-  ? (Resolved<D[0][1]> extends Parameters<F[0]> ? CheckPipe<
-      F extends [any, ...infer F_] ? (F_ extends λ[] ? F_ : never) : never,
-      D extends [any, ...infer D_] ? (D_ extends FunDef[] ? D_ : never)
-        : never,
-      Async extends true ? true
-        : ReturnType<F[0]> extends Promise<unknown> ? true
-        : false
-    >
-    : never)
-  : Resolved<D[0][1]> extends Parameters<F[0]>
-    ? (Async extends true ? MakeProm<ReturnType<F[0]>> : ReturnType<F[0]>)
-  : never;
-
-type Resolved<T extends unknown> = {
-  [K in keyof T]: T[K] extends Promise<infer I> ? I : T[K];
-};
-
-type ReturnTypes<T extends λ[]> = {
-  [K in keyof T]: ReturnType<T[K]>;
-};
-
-type CarryReturn<Returns extends any[], Args extends any[]> = Returns extends
-  [infer A, ...infer B] ? [[A, Args], ...CarryReturn<B, [A]>]
-  : [];
+  }
+}
