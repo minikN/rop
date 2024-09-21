@@ -1,5 +1,5 @@
-import { curry } from './util'
-import { pipe } from './util/pipe'
+import { pipe, asyncPipe } from './util/pipe'
+import { realpath } from 'node:fs/promises'
 
 // ---------------------------------
 // Holy bible: https://github.com/swlaschin/RailwayOrientedProgramming/blob/master/Railway_Oriented_Programming_Slideshare.pdf
@@ -10,12 +10,22 @@ type ErrorTypes =
   | 'NO_USER_NAME'
   | 'NO_USER_EMAIL'
   | 'USER_TOO_YOUNG'
+  | 'USER_NO_VALID_NAME'
+  | 'NO_PATH_GIVEN'
+  | 'INVALID_PATH_GIVEN'
+  | 'ERR_INVALID_ARG_TYPE'
+  | 'ENOENT'
 
 // Message for each error type
 const ErrorMessages = Object.freeze({
   NO_USER_NAME: 'No user name given: %d',
   NO_USER_EMAIL: 'No email given: %d',
-  USER_TOO_YOUNG: 'User too young: %d'
+  USER_TOO_YOUNG: 'User too young: %d',
+  USER_NO_VALID_NAME: 'Not a valid name',
+  NO_PATH_GIVEN: 'Not a valid name',
+  INVALID_PATH_GIVEN: 'Not a valid name',
+  ERR_INVALID_ARG_TYPE: 'No path given',
+  ENOENT: 'Invalid path given'
 })
 
 // Generic error interface that derives from the given
@@ -59,6 +69,9 @@ const createError = <T extends ErrorTypes>(type: T, options: string[]): CustomEr
 const noNameError = createError('NO_USER_NAME', [])
 const noEmailError = createError('NO_USER_EMAIL', [])
 const tooYoungError = createError('USER_TOO_YOUNG', [])
+const noValidNameError = createError('USER_NO_VALID_NAME', [])
+const noPathGivenError = createError('ERR_INVALID_ARG_TYPE', [])
+const invalidPathGivenError = createError('ENOENT', [])
 
 // Dummy User type for testing
 type User = {
@@ -72,19 +85,24 @@ type User = {
 // They receive a User and do something with it
 // (validate it, mutate it, whatever)
 
+class TestError extends Error {}
+class FooError extends Error {}
+class BarError extends Error {}
+
 /**
  * "Validates" the user name
  * @param user 
  * @returns 
  */
-const validateUserName = (user: User): Result<CustomError<'NO_USER_NAME'>, User> => {
+const validateUserName = (user: User): Result<TestError, User> => {
   console.log('name')
   if (user?.name?.length) {
     return Success(user)
   }
 
-  return Failure(noNameError)
-} 
+  return Failure(new TestError('bla'))
+}
+
 
 /**
  * "Validates" user age
@@ -113,6 +131,16 @@ const validateUserEmail = (user: User): Result<CustomError<'NO_USER_EMAIL'>, Use
   }
 
   return Failure(noEmailError)
+}
+
+
+const throwableOperation = async (user: User): Promise<Result<FooError | BarError, User>> => {
+  if (user.email.length) {
+    await realpath('')
+    return Success(user)
+  }
+
+  return Failure(new FooError('bls'))
 }
 
 /**
@@ -154,17 +182,14 @@ export const dual: {
 }
 
 const flatMap: {
-  <A, E2, B>(f: (a: A) => Result<E2, B>): <E1>(ma: Result<E1, A>) => Result<E1 | E2, B>
-  <E1, A, E2, B>(ma: Result<E1, A>, f: (a: A) => Result<E2, B>): Result<E1 | E2, B>
-} = /*#__PURE__*/ dual(
-  2,
-  <E1, A, E2, B>(ma: Result<E1, A>, f: (a: A) => Result<E2, B>): Result<E1 | E2, B> => (ma._tag === 'error' ? ma : f(ma.value))
+  <A, E2, B>(nextFunction: (a: A) => Result<E2, B> | Promise<Result<E2, B>>): <E1>(input: Result<E1, A>) => Result<E1 | E2, B>
+  <E1, A, E2, B>(input: Result<E1, A>, nextFunction: (a: A) => Result<E2, B>): Result<E1 | E2, B>
+} = dual(2,
+  <E1, A, E2, B>(input: Result<E1, A>, nextFunction: (a: A) => Result<E2, B>): Result<E1 | E2, B> => match(
+    nextFunction,
+    input
+  )
 )
-
-// const flatMap: {
-//   <A, E2, B>(f: (a: A) => Result<E2, B>): <E1>(ma: Result<E1, A>) => Result<E1 | E2, B>
-//   <E1, A, E2, B>(ma: Result<E1, A>, f: (a: A) => Result<E2, B>): Result<E1 | E2, B>
-// } = <E1, A, E2, B>(ma: Result<E1, A>, f: (a: A) => Result<E2, B>): Result<E1 | E2, B> => match(ma, ) 
 
 // const flattenW: <E1, E2, A>(mma: Result<E1, Result<E2, A>>) => Result<E1 | E2, A> = flatMap((x) => x)
 // const flatten: <E, A>(mma: Result<E, Result<E, A>>) => Result<E, A> = flattenW
@@ -178,17 +203,18 @@ const flatMap: {
  * @param {Function} value Callback for when happy path is matched
  * @returns 
  */
-const match = <pE, nE, pV, nV>(input: Result<pE, pV>, error: (e: pE) => nE, value: (v: pV) => nV): nE | nV => {
+const match = <E1, A, E2, B>(nextFunction: (a: A) => Result<E2, B>, input: Result<E1, A>) => {
   switch (input._tag) {
     case 'error':
-      return error(input.error)
+      return input
     case 'value':
-      return value(input.value)
-    // default:
-    //   const _exhaustive: never = input
-    //   return _exhaustive
+      return nextFunction(input.value)
+    default:
+      const _exhaustive: never = input
+      return _exhaustive
   }
 }
+
 
 /**
  * BIND ADAPTER FUNCTION
@@ -206,16 +232,21 @@ const match = <pE, nE, pV, nV>(input: Result<pE, pV>, error: (e: pE) => nE, valu
  * @param {Function} switchFunction 
  * @returns 
  */
+const bind = <E1, A, B>(singleFunction: (a: A) => B) => (previousValue: Result<E1, A>): Result<E1, B> => match(
+  (value) => Success(singleFunction(value)),
+  previousValue,
+)
+
 // const bind = <L, R>(switchFunction: (a: R) => Result<L, R>) => <pL>(previousValue: Result<pL, R>) => match(
 //   previousValue,
 //   error => error,
 //   value => switchFunction(value)
 // )
-const map = <pE, pV, E, V>(switchFunction: (v: pV) => Result<E, V>) => (previousValue: Result<pE, pV>) => match(
-  previousValue,
-  error => error,
-  value => switchFunction(value)
-)
+// const map = <pE, pV, E, V>(switchFunction: (v: pV) => Result<E, V>) => (previousValue: Result<pE, pV>) => match(
+//   previousValue,
+//   // error => error,
+//   value => switchFunction(value)
+// )
 
 // /**
 //  * MAP ADAPTER FUNCTION
@@ -243,7 +274,7 @@ const map = <pE, pV, E, V>(switchFunction: (v: pV) => Result<E, V>) => (previous
  * @param deadEndFunction 
  * @returns 
  */
-const tee = <T>(deadEndFunction: (a: T) => void) => (previousValue: T) => {
+const tap = <T>(deadEndFunction: (a: T) => void) => (previousValue: T) => {
   deadEndFunction(previousValue)
 
   return previousValue
@@ -259,11 +290,24 @@ const tee = <T>(deadEndFunction: (a: T) => void) => (previousValue: T) => {
  * @param switchFunction
  * @returns 
  */
-const guard = <L, R>(switchFunction: (a: R) => Result<L, R>) => (previousValue: R) => {
+// const guard = <E1, A, E2, B>(switchFunction: (a: A) => Result<E2, B>) => (previousValue: Result<E1, A>): Result<E1 | E2, B> => match(
+//   (value) => {
+//     try {
+//       return switchFunction(value)
+//     } catch(e) {
+//       return Failure(e)
+//     }
+//   },
+//   previousValue,
+// )
+const guard = <L, R, T extends Error>(
+  switchFunction: (a: R) => Result<L, R> | Promise<Result<L, R>>,
+  errors?: {[key: string]: T}
+) => async (previousValue: R) => {
   try {
-    return switchFunction(previousValue)
-  } catch (e) {
-    return Failure(e as L)
+    return await switchFunction(previousValue)
+  } catch (e: any) {
+    return Failure(errors?.[e.code] || e as L)
   }
 }
 
@@ -278,19 +322,31 @@ const john: User = {
   age: 18
 }
 
-const test1 = pipe(
+class EnoentError extends Error {
+  _tag: ''
+}
+
+const test1 = asyncPipe(
   Success(john),
   // x => x,
-  map(validateUserName),
+  flatMap(validateUserName),
   x => x,
   flatMap(validateUserAge),
   x => x,
   flatMap(validateUserEmail),
   x => x,
-  // map(capitalizeName),
+  bind(capitalizeName),
+  x => x,
+  tap((a) => console.log(a)),
+  x => x,
+  flatMap(guard(throwableOperation, {
+    'ENOENT': new BarError(),
+  })),
+  x => x,
   // bind(guard((a) => { throw new Error('test') })),
   // bind(tee((x) => {console.log('tee', x)})),
 )
 
 
-console.log('t1', test1)
+console.log('t1', await test1)
+const i = 1
